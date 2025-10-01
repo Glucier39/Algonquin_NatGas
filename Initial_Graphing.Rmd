@@ -1,0 +1,97 @@
+Geddy Lucier
+ENVS Senior Thesis - Quantmod Library Testing
+10/1/2025
+
+Preamble
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(quantmod)
+library(data.table)
+
+
+setwd("~/Documents/GitHub/ENVS_Seniorthesis")
+getwd()
+```
+Crude/Brent ticker data prep
+```{r}
+
+
+wti_ticker <- "CL=F"
+brent_ticker <- "BZ=F"
+
+start_date <- as.Date("2024-01-01")
+end_date <- as.Date("2024-12-31")
+
+# Download historical data
+getSymbols(wti_ticker, src = "yahoo", from = start_date, to = end_date, auto.assign = TRUE)
+getSymbols(brent_ticker, src = "yahoo", from = start_date, to = end_date, auto.assign = TRUE)
+
+brent <- data.table(Date = index(`BZ=F`), coredata(`BZ=F`))
+crude <- data.table(Date = index(`CL=F`), coredata(`CL=F`))
+
+oil_df <- brent %>%
+  left_join(crude, by = "Date")
+
+```
+
+Testing - Disaster DF 2024
+```{r}
+
+disasters <- read_csv("data/tx_disaster_raw.csv") 
+
+disasters24 <- disasters %>%
+  mutate(
+    Begin.Date = as.Date(`Begin Date`, format = "%B %d, %Y"),
+    End.Date   = as.Date(`End Date`, format = "%B %d, %Y")
+  ) %>%
+  filter(year(Begin.Date) == 2024) %>% # only 2024 disasters
+    mutate(
+    DisasterDate = map2(Begin.Date, End.Date, seq, by = "day")
+  ) %>%
+  unnest(DisasterDate) 
+
+table(disasters24$DisasterDate)
+
+#test <- left_join(oil_df, disasters24, by = c("Date" = "DisasterDate"))
+
+
+oil_disaster <- oil_df %>%
+  left_join(disasters24, by = c("Date" = "DisasterDate"))
+
+test <- oil_disaster %>%
+  filter(Type != "Drought")
+
+```
+
+
+two if else statements: first, if date == startdate, 
+
+maybe do by periods? 
+
+
+
+```{r}
+ggplot(test, aes(x = Date)) +
+  geom_line(aes(y = `CL=F.Close`, color = "WTI Crude")) +
+  geom_line(aes(y = `BZ=F.Close`, color = "Brent Crude")) +
+  
+  # Add disaster shading (if multiple disasters per day, use unique ranges)
+  geom_rect(
+    data = oil_disaster %>% distinct(Event, Type, Begin.Date, End.Date),
+    aes(xmin = Begin.Date, xmax = End.Date, ymin = -Inf, ymax = Inf, fill = Type),
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+  
+  labs(title = "Oil Prices with Disaster Periods",
+       y = "Price (USD)",
+       color = "Crude Type",
+       fill = "Disaster Type") +
+  theme_minimal()
+
+```
+
+
+
+
