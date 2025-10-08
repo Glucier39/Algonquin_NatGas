@@ -8,6 +8,10 @@ library(tidyverse)
 library(ggplot2)
 library(quantmod)
 library(data.table)
+library(ggthemes)
+library(tidyquant)
+library(purrr)
+library(alphavantager)
 
 
 setwd("~/Documents/GitHub/ENVS_Seniorthesis")
@@ -28,10 +32,10 @@ getSymbols(wti_ticker, src = "yahoo", from = start_date, to = end_date, auto.ass
 getSymbols(brent_ticker, src = "yahoo", from = start_date, to = end_date, auto.assign = TRUE)
 
 brent <- data.table(Date = index(`BZ=F`), coredata(`BZ=F`))
-crude <- data.table(Date = index(`CL=F`), coredata(`CL=F`))
+wti <- data.table(Date = index(`CL=F`), coredata(`CL=F`))
 
 oil_df <- brent %>%
-  left_join(crude, by = "Date")
+  left_join(wti, by = "Date")
 
 ```
 
@@ -41,6 +45,7 @@ Testing - Disaster DF 2024
 disasters <- read_csv("data/tx_disaster_raw.csv") 
 
 disasters24 <- disasters %>%
+  filter(Type != "Drought") %>% 
   mutate(
     Begin.Date = as.Date(`Begin Date`, format = "%B %d, %Y"),
     End.Date   = as.Date(`End Date`, format = "%B %d, %Y")
@@ -51,16 +56,31 @@ disasters24 <- disasters %>%
   ) %>%
   unnest(DisasterDate) 
 
-table(disasters24$DisasterDate)
 
 #test <- left_join(oil_df, disasters24, by = c("Date" = "DisasterDate"))
 
 
 oil_disaster <- oil_df %>%
-  left_join(disasters24, by = c("Date" = "DisasterDate"))
+  left_join(disasters24, by = c("Date" = "DisasterDate")) %>% 
+  mutate(
+    close_diff = `BZ=F.Close` - `CL=F.Close`,
+    month = as.numeric(substr(Date, 6, 7)),
+    year = lubridate::year(Date),
+    season = case_when(
+      month %in% c(12, 1, 2) ~ "Winter",
+      month %in% c(3, 4, 5)  ~ "Spring",
+      month %in% c(6, 7, 8)  ~ "Summer",
+      month %in% c(9, 10, 11) ~ "Fall"
+    ),
+    # Create combined label to distinguish Winter 2023-24 vs Winter 2024-25
+    season_year = case_when(
+      month == 12 ~ paste0(season, " ", year, "-", year + 1),
+      TRUE        ~ paste0(season, " ", year)
+    )
+  )
 
-test <- oil_disaster %>%
-  filter(Type != "Drought")
+  
+
 
 ```
 
@@ -72,26 +92,116 @@ maybe do by periods?
 
 
 ```{r}
-ggplot(test, aes(x = Date)) +
-  geom_line(aes(y = `CL=F.Close`, color = "WTI Crude")) +
-  geom_line(aes(y = `BZ=F.Close`, color = "Brent Crude")) +
-  
-  # Add disaster shading (if multiple disasters per day, use unique ranges)
-  geom_rect(
-    data = oil_disaster %>% distinct(Event, Type, Begin.Date, End.Date),
-    aes(xmin = Begin.Date, xmax = End.Date, ymin = -Inf, ymax = Inf, fill = Type),
-    alpha = 0.2,
-    inherit.aes = FALSE
+
+
+ggplot(oil_disaster, aes(x = Date)) +
+  # Fill between Brent and WTI only during disaster days
+geom_ribbon(
+  data = oil_disaster %>% filter(!is.na(Type)),
+  aes(ymin = pmin(`CL=F.Close`, `BZ=F.Close`, na.rm = TRUE),
+      ymax = pmax(`CL=F.Close`, `BZ=F.Close`, na.rm = TRUE),
+      fill = Type,
+      group = Event),
+  alpha = 0.9
+) +
+   geom_line(
+    data = oil_disaster %>% filter(!is.na(Type)),
+    aes(y = pmin(`CL=F.Close`, `BZ=F.Close`, na.rm = TRUE),
+        group = Event),
+    color = "black", linewidth = 0.3
   ) +
-  
-  labs(title = "Oil Prices with Disaster Periods",
-       y = "Price (USD)",
-       color = "Crude Type",
-       fill = "Disaster Type") +
-  theme_minimal()
+  # Oil price lines
+  geom_line(aes(y = `CL=F.Close`, color = "WTI Crude"), na.rm = TRUE) +
+  geom_line(aes(y = `BZ=F.Close`, color = "Brent Crude")) +
+  labs(
+    title = "Brent and WTI Across Texas Weather Disasters 2024",
+    y = "Price (USD)",
+    x = "Date",
+    color = "Crude Type",
+    fill  = "Disaster Type"
+  ) +
+scale_color_manual(values = c(
+    "Brent Crude" = "#B44600",  # deep orange
+    "WTI Crude"   = "#004488"   # dark navy blue
+  )) +
+  scale_fill_manual(values = c(
+    "Winter Storm"     = "#4DB3FF",  # bright icy blue
+    "Tropical Cyclone" = "#00CC44",  # bright green
+    "Severe Storm"     = "#FF3333"   # bright red
+  )) +
+  theme_bw()
+```
+```{r}
+ oil_disaster %>%
+  filter(season_year != "Winter 2024-2025") %>%
+  ggplot(aes(x = Date)) +
+  # Fill between Brent and WTI only during disaster days
+  geom_ribbon(
+    data = . %>% filter(!is.na(Type)),
+    aes(ymin = pmin(`CL=F.Close`, `BZ=F.Close`, na.rm = TRUE),
+        ymax = pmax(`CL=F.Close`, `BZ=F.Close`, na.rm = TRUE),
+        fill = Type,
+        group = Event),
+    alpha = 0.9
+  ) +
+  geom_line(
+    data = . %>% filter(!is.na(Type)),
+    aes(y = pmin(`CL=F.Close`, `BZ=F.Close`, na.rm = TRUE),
+        group = Event),
+    color = "black", linewidth = 0.3
+  ) +
+  # Oil price lines
+  geom_line(aes(y = `CL=F.Close`, color = "WTI Crude"), na.rm = TRUE) +
+  geom_line(aes(y = `BZ=F.Close`, color = "Brent Crude")) +
+  labs(
+    title = "Brent and WTI Across Texas Weather Disasters 2024",
+    y = "Price (USD)",
+    x = "Date",
+    color = "Crude Type",
+    fill  = "Disaster Type"
+  ) +
+  scale_color_manual(values = c(
+    "Brent Crude" = "#B44600",  # deep orange
+    "WTI Crude"   = "#004488"   # dark navy blue
+  )) +
+  scale_fill_manual(values = c(
+    "Winter Storm"     = "#4DB3FF",  # bright icy blue
+    "Tropical Cyclone" = "#00CC44",  # bright green
+    "Severe Storm"     = "#FF3333"   # bright red
+  )) +
+  theme_bw() +
+  facet_wrap(~ season, scales = "free_x")
 
 ```
 
 
+```{r}
+library(ggplot2)
+library(dplyr)
 
-
+ggplot(oil_disaster, aes(x = Date)) +
+  # Highlight full vertical span for disaster periods
+  geom_rect(
+    data = oil_disaster %>% filter(!is.na(Type)) %>% distinct(Event, Type, Begin.Date, End.Date),
+    aes(xmin = Begin.Date, xmax = End.Date,
+        ymin = -Inf, ymax = Inf, fill = Type),
+    inherit.aes = FALSE, alpha = 0.2
+  ) +
+  # Difference line (Brent - WTI)
+  geom_line(aes(y = close_diff, color = "Brent-WTI Spread"), linewidth = 0.8, na.rm = TRUE) +
+  labs(
+    title = "Brent-WTI Pricing Difference Across Texas Weather Disasters (2024)",
+    y = "Price Difference (USD)",
+    x = "Date",
+    color = "Series",
+    fill  = "Disaster Type"
+  ) +
+  scale_color_manual(values = c("Brent-WTI Spread" = "black")) +
+  scale_fill_manual(values = c(
+    "Winter Storm"     = "#4DB3FF",   # bright icy blue
+    "Tropical Cyclone" = "#00CC44",   # bright green
+    "Severe Storm"     = "#FF3333"    # bright red
+  )) +
+  theme_bw()
+```
+  
