@@ -1,0 +1,77 @@
+Geddy Lucier
+ENVS - 
+
+Testing out what happens to stock market returns after major market crashes using an event series method.
+Using quantmod package for stock data. This is how I learned a lot of my machine learning techniques, so I think it will be great practice
+
+Did S&P 500 returns change significantly after March 16, 2020 (COVID crash) compared to before?
+
+Preamble
+```{r}
+library(quantmod)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+```
+Data preparation
+
+
+
+Data loading
+```{r}
+getSymbols("^GSPC", from = "2019-01-01", to = "2020-09-01")
+sp500 <- data.frame(date = index(GSPC), coredata(GSPC))
+sp500 <- sp500 %>%
+  mutate(return = 100 * (GSPC.Adjusted / lag(GSPC.Adjusted) - 1))
+
+#comes fromr the quantmod package, pulling s&p500 daily prices on the designated dates
+```
+
+
+Event series
+```{r}
+# building a date to run event series on. Covid crash
+event_date <- as.Date("2020-03-16")
+
+pre_window <- sp500 %>% filter(date >= event_date - 60 & date < event_date)
+post_window <- sp500 %>% filter(date > event_date & date <= event_date + 60)
+
+```
+
+```{r}
+ggplot(sp500 %>% filter(date >= event_date - 60 & date <= event_date + 60),
+       aes(x = date, y = return)) +
+  geom_line(color = "steelblue") +
+  geom_vline(xintercept = as.numeric(event_date), color = "red", linetype = "dashed") +
+  labs(title = "S&P 500 Returns Around COVID-19 Crash", y = "Daily Return (%)")
+#visualisation
+```
+
+```{r}
+t_test_result <- t.test(post_window$return, pre_window$return, alternative = "two.sided")
+t_test_result
+#not a statistically significant result/event
+#how does causality/correlation work in this case
+```
+```{r}
+avg_returns <- data.frame(
+  period = c("Pre-event", "Post-event"),
+  mean_return = c(mean(pre_window$return, na.rm = TRUE),
+                  mean(post_window$return, na.rm = TRUE))
+)
+
+ggplot(avg_returns, aes(x = period, y = mean_return, fill = period)) +
+  geom_col(width = 0.6) +
+  labs(title = "Mean Returns Before and After COVID Crash", y = "Mean Daily Return (%)") +
+  theme_minimal()
+# this seems like a question of causality and market growth rather than anything caused primarily by covid.
+#doesn't quite pass the smell test 
+#for hurricanes/oil spread, I would need to be very careful about what I 
+
+
+```
+
+
+
+
+
