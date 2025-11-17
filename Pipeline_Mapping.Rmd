@@ -1,0 +1,157 @@
+Geddy Lucier
+Pipeline Mapping Across US
+
+```{r}
+library(tidyverse)
+library(maps)
+library(sf)
+
+setwd("~/Documents/GitHub/ENVS_Seniorthesis/")
+```
+
+
+General US mapping
+```{r}
+pipes <- st_read("naturalgas_interintrastate_pipelines_us_eia.geojson")
+us <- st_as_sf(map("state", plot = FALSE, fill = TRUE))
+us <- st_transform(us, 4326)
+
+boston_sf <- st_as_sf(
+  data.frame(
+    city = "Boston",
+    lon = -71.0589,
+    lat = 42.3601
+  ),
+  coords = c("lon", "lat"),
+  crs = 4326
+) #manually build boston 
+
+chicago_sf <- st_as_sf(
+  data.frame(
+    city = "Chicago",
+    lon = -87.6298,
+    lat = 41.8781
+  ),
+  coords = c("lon", "lat"),
+  crs = 4326
+) # same with chicago
+
+ggplot() +
+  # US map first
+  geom_sf(
+    data = us,
+    fill = "gray85",
+    color = "white"
+  ) +
+  # Pipeline layer on top
+  geom_sf(
+    data = pipes,
+    color = "red",
+    size = 0.2,
+    alpha = 0.8
+  ) +
+  coord_sf() +
+  theme_minimal() +
+  labs(
+    title = "U.S. Natural Gas Pipeline Network",
+    x = "",
+    y = ""
+  )
+```
+
+```{r}
+MA <- us %>%
+  filter(ID == "massachusetts") # mass 
+
+ma_pipes <- st_intersection(pipes, MA)
+
+IL <- us %>%
+  filter(ID == "illinois")
+
+il_pipes <- st_intersection(pipes, IL)
+
+
+```
+MA
+```{r}
+ggplot() +
+  # State outline (transparent fill)
+  geom_sf(data = MA, fill = NA, color = "#2F2F2F", size = 0.6) +
+  
+  # Pipelines
+  geom_sf(data = ma_pipes, color = "#3A6EA5", size = 0.8, alpha = 0.7) +
+  
+  # City point with legend
+  geom_sf(
+    data = boston_sf,
+    aes(color = city),
+    size = 3
+  ) +
+  
+  # Color settings for the legend
+  scale_color_manual(values = c("Boston" = "#E76F51"), name = "City") +
+  
+  # Zoom into Boston
+  coord_sf(
+    xlim = c(-72.0, -70.4),
+    ylim = c(41.9, 42.8),
+    expand = FALSE
+  ) +
+  
+  # Remove axis text, ticks, and grid
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 9)
+  ) +
+  
+  labs(title = "Natural Gas Pipelines Near Boston")
+
+```
+IL
+```{r}
+ggplot() +
+  # State outline (transparent fill)
+  geom_sf(data = IL, fill = NA, color = "#2F2F2F", size = 0.6) +
+  
+  # Pipelines
+  geom_sf(data = il_pipes, color = "#3A6EA5", size = 0.8, alpha = 0.7) +
+  
+  # City point with legend
+  geom_sf(
+    data = chicago_sf,
+    aes(color = city),
+    size = 3
+  ) +
+  
+  # Color settings for the legend
+  scale_color_manual(values = c("Chicago" = "#E76F51"), name = "City") +
+  
+  # Zoom into Chicago
+ coord_sf(
+  xlim = c(-89.3, -86.3),
+  ylim = c(40.6, 42.6),
+  expand = FALSE
+) +
+  
+  # Remove axis text, ticks, grid
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 9)
+  ) +
+  
+  labs(title = "Natural Gas Pipelines Near Chicago")
+
+```
+
