@@ -1,0 +1,97 @@
+Geddy Lucier
+ENVS - 
+
+Testing out what happens to stock market returns after major market crashes using an event series method.
+Using quantmod package for stock data. This is how I learned a lot of my machine learning techniques, so I think it will be great practice for actually applying it to my dataset. 
+
+
+For this project, I downloaded historical S&P 500 stock market data using the quantmod package, which retrieves financial data directly from Yahoo Finance.
+The dataset spans from January 2019 to September 2020 — a period that includes the COVID-19 market crash of March 2020.
+This allows me to test whether stock returns changed significantly after the crash. Did S&P 500 returns change significantly after March 16, 2020 (COVID crash) compared to before?
+
+Preamble
+```{r}
+library(quantmod)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+```
+The S&P 500 dataset includes daily financial information for the U.S. stock market index.
+Each observation represents one trading day.
+Key variables include:
+
+date: the trading day
+
+GSPC.Open, GSPC.High, GSPC.Low, GSPC.Close, GSPC.Volume, GSPC.Adjusted: standard OHLC and volume data
+
+return: calculated daily percentage change in adjusted closing price
+
+The scope covers a 21-month window surrounding the onset of the COVID-19 pandemic, capturing both pre-crash and post-crash behavior.
+
+Data loading
+```{r}
+getSymbols("^GSPC", from = "2019-01-01", to = "2020-09-01")
+sp500 <- data.frame(date = index(GSPC), coredata(GSPC))
+sp500 <- sp500 %>%
+  mutate(return = 100 * (GSPC.Adjusted / lag(GSPC.Adjusted) - 1))
+
+#comes fromr the quantmod package, pulling s&p500 daily prices on the designated dates
+```
+I conducted an event study using a two-sample t-test to evaluate whether mean daily returns changed significantly after March 16, 2020 (the height of the COVID-19 market crash) compared to the 60 trading days before. I expect there won't be anything. 
+
+Event study
+```{r}
+# building a date to run event series on. Covid crash
+event_date <- as.Date("2020-03-16")
+
+pre_window <- sp500 %>% filter(date >= event_date - 60 & date < event_date)
+post_window <- sp500 %>% filter(date > event_date & date <= event_date + 60)
+
+```
+
+```{r}
+ggplot(sp500 %>% filter(date >= event_date - 60 & date <= event_date + 60),
+       aes(x = date, y = return)) +
+  geom_line(color = "steelblue") +
+  geom_vline(xintercept = as.numeric(event_date), color = "red", linetype = "dashed") +
+  labs(title = "S&P 500 Returns Around COVID-19 Crash", y = "Daily Return (%)")
+#visualisation
+```
+The two-sample t-test is appropriate because it compares mean values between two independent groups (returns before vs. after the event).
+The goal is to determine if the event (COVID crash) led to a statistically significant shift in daily stock returns.
+This test assumes approximate normality and independence between daily observations, which is reasonable for short-term return data.
+
+```{r}
+t_test_result <- t.test(post_window$return, pre_window$return, alternative = "two.sided")
+t_test_result
+#not a statistically significant result/event
+#how does causality/correlation work in this case
+```
+The t-test produced a p-value greater than 0.05, indicating that the difference in average daily returns before and after March 16, 2020 was not statistically significant at the 5% level. It was around 0.19. 
+
+While visually the crash appears dramatic, the test suggests that the market’s average daily returns in the 60-day windows were not statistically distinguishable, potentially because the recovery in April–May offset the extreme losses in March.
+This highlights that a single-event comparison may not fully capture the volatility or structural changes caused by the pandemic, and so I'll have to see how it handles my data and my dataset. 
+
+
+```{r}
+avg_returns <- data.frame(
+  period = c("Pre-event", "Post-event"),
+  mean_return = c(mean(pre_window$return, na.rm = TRUE),
+                  mean(post_window$return, na.rm = TRUE))
+)
+
+ggplot(avg_returns, aes(x = period, y = mean_return, fill = period)) +
+  geom_col(width = 0.6) +
+  labs(title = "Mean Returns Before and After COVID Crash", y = "Mean Daily Return (%)") +
+  theme_minimal()
+# this seems like a question of causality and market growth rather than anything caused primarily by covid.
+#doesn't quite pass the smell test 
+#for hurricanes/oil spread, I would need to be very careful about what I 
+
+
+```
+
+
+
+
+

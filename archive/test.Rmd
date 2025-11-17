@@ -1,0 +1,220 @@
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(quantmod)
+library(data.table)
+library(ggthemes)
+library(tidyquant)
+library(purrr)
+library(alphavantager)
+library(forecast)
+library(eventstudyr)
+
+api_key <- "16eGcenELfs3j9AVtmjBNa9Z5Fj8btivUyBJQSr3"
+
+
+setwd("~/Documents/GitHub/ENVS_Seniorthesis")
+getwd()
+```
+
+
+```{r}
+disasters <- read_csv("data/tx_disaster_raw.csv") 
+
+
+disasters_clean <- disasters %>% 
+  filter(Type %in% c("Tropical Cyclone", "Winter Storm", "Severe Storm")) %>%
+  mutate(
+    `Begin Date` = mdy(`Begin Date`),
+    `End Date` = mdy(`End Date`),
+    Begin = `Begin Date`,
+    End = `End Date`,
+    window_start = Begin - days(7), #time series window 
+    window_end   = End + days(7)
+  ) %>%
+  select(-`Begin Date`, -`End Date`)
+
+cyclone <- disasters_clean %>%
+  filter(Type == "Tropical Cyclone") %>%
+  mutate(
+    window_start = as.Date(window_start),
+    window_end = as.Date(window_end),
+  )
+
+
+sstorm <- disasters_clean %>%
+  filter(Type == "Severe Storm")
+
+wstorm <- disasters_clean %>%
+  filter(Type == "Winter Storm")
+
+```
+test
+```{r}
+cyclone_expanded <- cyclone %>%
+  mutate(
+    date_seq = map2(window_start, window_end, seq, by = "day")
+  ) %>%
+  unnest(date_seq) %>%
+  rename(Date = date_seq) 
+```
+
+
+Date intervals 
+```{r}
+symbols <- c("CL=F", "BZ=F")
+
+for (i in 1:nrow(cyclone)) {
+  start_date <- cyclone$window_start[i]
+  end_date   <- cyclone$window_end[i]
+  
+  cat("Fetching data for Tropical Cyclone", i, "from", start_date, "to", end_date, "\n")
+  
+  # --- Fetch WTI (West Texas Intermediate) ---
+  wti <- tryCatch(
+    getSymbols("CL=F", src = "yahoo", from = start_date, to = end_date, auto.assign = FALSE),
+    error = function(e) NULL
+  )
+  
+  # --- Fetch Brent ---
+  brent <- tryCatch(
+    getSymbols("BZ=F", src = "yahoo", from = start_date, to = end_date, auto.assign = FALSE),
+    error = function(e) NULL
+  )
+  
+  # --- Combine if successful ---
+  if (!is.null(wti) & !is.null(brent)) {
+    
+    merged <- merge(wti, brent)
+    names(merged) <- c(
+      "WTI.Open", "WTI.High", "WTI.Low", "WTI.Close", "WTI.Volume", "WTI.Adjusted",
+      "Brent.Open", "Brent.High", "Brent.Low", "Brent.Close", "Brent.Volume", "Brent.Adjusted"
+    )
+    
+    merged <- data.frame(Date = index(merged), coredata(merged))
+    merged$Event_ID <- i
+    merged$Type <- cyclone$Type[i]
+    
+    price_data_list[[i]] <- merged
+  }
+  
+  # small delay to prevent throttling
+  Sys.sleep(2)
+}
+
+# 4️⃣ Combine all event windows into one tidy dataframe
+cyclone_prices <- bind_rows(price_data_list)
+```
+
+```{r}
+test_df <- cyclone_expanded %>% 
+  left_join(cyclone_prices, by = "Date") 
+  
+francine <- test_df %>% filter(Event == "Hurricane FrancineSeptember 2024") %>%
+  mutate(
+    Date = as.Date(Date),
+    Spread = Brent.Close - WTI.Close,
+    Day_Relative = as.numeric(Date - Begin[1]) # 0 = landfall
+  )
+
+ggplot(francine, aes(x = Date)) +
+  geom_line(aes(y = WTI.Close, color = "WTI")) +
+  geom_line(aes(y = Brent.Close, color = "Brent")) +
+  geom_vline(xintercept = as.numeric(unique(francine$Begin)), linetype = "dashed", color = "red") +
+  labs(
+    title = "WTI vs Brent Prices Around Hurricane Francine",
+    y = "Price (USD per barrel)",
+    x = "Date",
+    color = "Series"
+  ) +
+  theme_minimal()
+
+
+
+```
+
+```{r}
+
+# define pre- and post-event periods (7 days before / 7 days after)
+francine <- francine %>%
+  mutate(
+    period = case_when(
+      Date < Begin[1] ~ "Pre",
+      Date >= Begin[1] ~ "Post"
+    )
+  )
+
+# visualize spread change
+ggplot(francine, aes(x = Date, y = Spread, color = period)) +
+  geom_line(size = 1) +
+  geom_vline(xintercept = as.numeric(unique(francine$Begin)), linetype = "dashed", color = "red") +
+  labs(
+    title = "Brent–WTI Spread Before and After Hurricane Francine",
+    y = "Spread (USD)",
+    x = "Date"
+  ) +
+  theme_minimal()
+
+# run a two-sample t-test
+pre  <- francine %>% filter(period == "Pre")  %>% pull(Spread)
+post <- francine %>% filter(period == "Post") %>% pull(Spread)
+
+t_test_result <- t.test(pre, post, alternative = "two.sided")
+
+t_test_result
+
+```
+
+```{r}
+francine_filled <- francine %>%
+  complete(Date = seq(min(Date), max(Date), by = "day")) %>%
+  fill(WTI.Close, Brent.Close, .direction = "down") %>%
+  mutate(
+    Spread = Brent.Close - WTI.Close,
+    period = if_else(Date < Begin[1], "Pre", "Post")
+  )
+
+ggplot(francine_filled, aes(x = Date, y = Spread, color = period)) +
+  geom_line(size = 1.1) +
+  geom_vline(xintercept = as.numeric(unique(francine_filled$Begin)), 
+             linetype = "dashed", color = "red") +
+  labs(
+    title = "Brent–WTI Spread (Weekend-Filled) Around Hurricane Francine",
+    y = "Spread (USD per barrel)",
+    x = "Date",
+    color = "Period"
+  ) +
+  theme_minimal(base_size = 13)
+
+pre  <- francine_filled %>% filter(period == "Pre")  %>% pull(Spread)
+post <- francine_filled %>% filter(period == "Post") %>% pull(Spread)
+
+pre  <- francine_filled %>% filter(period == "Pre")  %>% pull(Spread)
+post <- francine_filled %>% filter(period == "Post") %>% pull(Spread)
+
+t_test_filled <- t.test(pre, post, alternative = "two.sided")
+t_test_filled
+```
+
+```{r}
+library(httr)
+library(jsonlite)
+
+url <- "https://api.eia.gov/v2/electricity/retail-sales/data/"
+
+params <- list(
+  api_key = api_key,
+  `data[]` = "price",
+  `facets[stateid][]` = "CO",
+  `facets[sectorid][]` = "RES",
+  frequency = "monthly"
+)
+
+response <- GET(url, query = params)
+data <- fromJSON(content(response, "text"))
+
+# Flatten the JSON structure into a dataframe
+df <- as.data.frame(data$response$data)
+head(df)
+```
+
