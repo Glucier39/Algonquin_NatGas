@@ -5,14 +5,28 @@ Pipeline Mapping Across US
 library(tidyverse)
 library(maps)
 library(sf)
-
+library(ggspatial)
+library(terra)
+library(tidyterra)
+library(ggplot2)
+library(basemaps)
+library(OpenStreetMap)
+library(maptiles)
+library(rmapshaper)
+library(sfnetworks)
+library(dplyr)
 setwd("~/Documents/GitHub/ENVS_Seniorthesis/")
 ```
 
 
 General US mapping
 ```{r}
-pipes <- st_read("naturalgas_interintrastate_pipelines_us_eia.geojson")
+pipes <- st_read("data/naturalgas_interintrastate_pipelines_us_eia.geojson")
+
+basin <- st_read("data/MiddleDevonianMarcellusShaleAUs/")
+basin <- st_transform(basin, 4326)
+
+
 us <- st_as_sf(map("state", plot = FALSE, fill = TRUE))
 us <- st_transform(us, 4326)
 
@@ -58,6 +72,67 @@ ggplot() +
     y = ""
   )
 ```
+
+```{r}
+
+```
+
+
+
+
+
+
+
+```{r}
+marcellus_ops <- c(
+  "ANR Pipeline Co",
+  "Vector Pipeline Co",
+  "Rockies Express Pipeline",
+  "Texas Eastern Trans Co",
+  "Northern Border PL Co",
+  "Natural Gas PL Co of Am",     # NGPL
+  "Panhandle Eastern PL Co"      # receives REX + ANR blends
+)
+
+marcellus_opps_df <- pipes %>% filter(operator %in% marcellus_ops)
+
+marcellus_bbox <- st_bbox(c(
+  xmin = -83,
+  xmax = -73.5,
+  ymin = 37.5,
+  ymax = 43
+), crs = 4326) |>
+  st_as_sfc()
+
+marcellus_pipes <- st_filter(pipes, basin)
+
+ma_marcellus_pipes <- st_filter(marcellus_pipes, ma_pipes)
+
+ggplot() +
+  # US map first
+  geom_sf(
+    data = us,
+    fill = "gray85",
+    color = "white"
+  ) +
+  # Pipeline layer on top
+  geom_sf(
+    data = marcellus_pipes,
+    color = "red",
+    size = 0.2,
+    alpha = 0.8
+  ) +
+  coord_sf() +
+  theme_minimal() +
+  labs(
+    title = "U.S. Natural Gas Pipeline Network",
+    x = "",
+    y = ""
+  )
+```
+
+
+
 
 ```{r}
 MA <- us %>%
@@ -154,4 +229,94 @@ ggplot() +
   labs(title = "Natural Gas Pipelines Near Chicago")
 
 ```
+```{r}
+
+
+bm_il<- get_tiles(
+  IL,                     # NOT ext=
+  provider = "CartoDB.Positron",  # or any provider
+  zoom = 10                    # increase or decrease as needed
+)
+
+bm_il_df <- as.data.frame(bm_il, xy = TRUE)
+
+colnames(bm_il_df)[1:5] <- c("x", "y", "R", "G", "B")
+
+
+ggplot() +
+  
+  geom_raster(
+    data = bm_il_df,
+    aes(x = x, y = y, fill = rgb(R, G, B, maxColorValue = 255)),
+    alpha = 1
+  ) +
+  scale_fill_identity() +
+  
+  geom_sf(data = IL, fill = NA, color = "#2F2F2F", size = 0.6, alpha = 0.5) +
+  geom_sf(data = il_pipes, color = "#3A6EA5", size = 0.8, alpha = 0.7) +
+  geom_sf(
+    data = chicago_sf,
+    aes(color = city),
+    size = 3
+  ) +
+  
+  scale_color_manual(values = c("Chicago" = "#E76F51"), name = "City") +
+  
+  # ---- SAME ZOOM WINDOW ----
+  coord_sf(
+    xlim = c(-89.3, -86.3),
+    ylim = c(40.6, 42.6),
+    expand = FALSE
+  ) +
+  
+  # ---- SAME THEME ----
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 9)
+  ) +
+  
+  labs(title = "Natural Gas Pipelines Near Chicago")
+
+```
+Nodal Testing
+```{r}
+
+unique(sf::st_geometry_type(pipes))
+
+
+pipe_net <- as_sfnetwork(pipes, directed = FALSE)
+
+# extract only nodes
+nodes <- pipe_net %>% activate(nodes)
+
+# find which nodes lie inside the basin polygon
+origin_nodes <- st_within(nodes, basin, sparse = FALSE)
+
+# vector of node indices that lie in the Marcellus area
+origin_idx <- which(origin_nodes)
+
+
+pipe_components <- igraph::components(pipe_net$graph)
+
+# which component each node belongs to
+node_component <- pipe_components$membership
+
+# which components include Marcellus-origin nodes?
+origin_components <- unique(node_component[origin_idx])
+
+
+connected_nodes <- which(node_component %in% origin_components)
+
+# convert back to sf
+pipes_connected <- pipe_net %>% 
+  activate(edges) %>% 
+  filter(.inc(connected_nodes))
+```
+
 
