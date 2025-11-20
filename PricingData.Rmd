@@ -1,0 +1,47 @@
+Geddy Lucier
+Senior Thesis
+
+```{r}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(lubridate)
+
+
+readRenviron(".Renviron") # Build API Key into your prospective .Renviron document
+setwd("~/Documents/GitHub/ENVS_Seniorthesis/")
+Sys.getenv("EIA_API_KEY") # Sign up with EIA to get API key for pricing data
+
+```
+
+```{r}
+get_ng_spot <- function(series_id) {
+  
+  url <- "https://api.eia.gov/series/"
+  
+  res <- httr::GET(url, query = list(
+    api_key = Sys.getenv("EIA_API_KEY"),
+    series_id = series_id
+  ))
+  
+  data_raw <- jsonlite::fromJSON(httr::content(res, "text", encoding="UTF-8"))
+  
+  # Return EXACT raw data frame as provided by API
+  tibble::as_tibble(data_raw$series[[1]]$data)
+}
+
+
+```
+
+
+
+Pull Algonquin, Henry, and Chicago Hub
+```{r}
+readRenviron(".Renviron")
+
+algonquin <- get_ng_spot("NG.RNGC1.ALG.D")
+henry     <- get_ng_spot("NG.RNGC1.HH.D")
+chicago   <- get_ng_spot("NG.RNGC1.CHG.D")
+```
+
