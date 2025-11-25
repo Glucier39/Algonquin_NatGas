@@ -402,6 +402,7 @@ for (i in 1:nrow(stats_by_year)) {
 }
 
 ```
+
 ```{r}
 stats_long <- stats_by_year %>%
   pivot_longer(
