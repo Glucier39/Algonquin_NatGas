@@ -37,3 +37,5 @@ The Marcellus Shale is a major Devonian-age natural-gas formation across Pennsyl
 The central goal of this project is to quantify the **environmental policy price premium** faced by Boston due to regional pipeline constraints, state-level climate policy, and reliance on LNG imports. This premium reflects how much higher Boston’s natural-gas prices are (on average) compared to upstream hubs—specifically those located within the Marcellus Basin—because of regulatory and permitting barriers that restrict pipeline expansion.
 
 ## Experimental Design
+
+## Current Findings
