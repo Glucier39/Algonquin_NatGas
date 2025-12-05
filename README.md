@@ -1,44 +1,39 @@
-Background
-The Marcellus Basin
+# Background
 
 The Marcellus Shale is a major Devonian-age natural-gas formation across Pennsylvania, West Virginia, Ohio, and New York. Enabled by horizontal drilling and hydraulic fracturing, it has become one of the most productive and cost-advantaged natural-gas regions in the United States. Despite this upstream abundance, downstream consumers in New England remain structurally disconnected from low-cost Marcellus gas due to interstate pipeline limitations and state-level environmental permitting regimes.
 
-Pipeline Infrastructure as the Key Constraint
+## Environmental & Regulatory Constraints Affecting New England Gas Markets
 
-While Massachusetts is often framed as “pipeline constrained,” the dominant bottleneck preventing Marcellus gas from reaching New England originates in New York State’s use of Clean Water Act §401 water-quality permits. The New York State Department of Environmental Conservation (NYSDEC) denied several major pipeline projects—including the Constitution Pipeline, Northeast Energy Direct, Access Northeast, and Northern Access—effectively blocking all major west-to-east expansion capacity that would supply Massachusetts.
+### Regional Constraints
 
-Within Massachusetts, regulatory and climate policies reinforce these constraints. The Massachusetts Supreme Judicial Court’s 2016 ENGIE v. DPU ruling prohibited utilities from charging electricity ratepayers for pipeline expansion costs, eliminating the main financing pathway for new infrastructure. The Global Warming Solutions Act (GWSA) and subsequent DPU “Future of Gas” proceedings further signaled that long-lived fossil-fuel infrastructure is inconsistent with the state’s decarbonization pathway.
+- **Clean Water Act §401 Permit Denials (New York State DEC)**  
+  - Constitution Pipeline  
+  - Northeast Energy Direct (NED)  
+  - Access Northeast  
+  - Northern Access Pipeline  
+  - **Effect:** Prevents Marcellus gas from physically reaching New England.
 
-Consequences for Boston’s Natural Gas Prices
+- **Limited Interconnections to the National Pipeline Grid**  
+  - **Effect:** New England has few entry points (Tennessee Gas, Algonquin, Iroquois), while Chicago has multiple high-capacity connections, preventing similar constraints.
 
-Because of these constraints, Boston remains heavily reliant on imported LNG and limited interstate pipeline access, despite being geographically close to one of the cheapest gas basins in the world. According to the U.S. Energy Information Administration, Massachusetts has no natural-gas production, no underground storage, and receives its gas from a combination of interstate pipelines and LNG imports. These structural limitations expose the region to extreme winter volatility and some of the highest delivered natural-gas prices in the country.
+### State-Level Constraints (Massachusetts)
 
-Basis Spread Evidence
+- **ENGIE Gas & LNG v. Department of Public Utilities (2016)**  
+  - **Effect:** Prohibits electric ratepayers from funding new pipeline capacity, eliminating the primary financing mechanism for major gas infrastructure projects.
 
-The figure below illustrates daily natural-gas basis spreads between major hubs. Algonquin Citygate—Boston’s key price point—demonstrates extreme winter volatility relative to both Chicago and Henry Hub, reflecting constraints in the regional pipeline network and dependence on LNG cargoes.
+- **Global Warming Solutions Act (GWSA, 2008; updated 2021)**  
+  - **Effect:** Mandates steep emissions reductions and net-zero by 2050, causing regulators to treat long-lived gas infrastructure as inconsistent with state climate targets.
 
-Daily Natural Gas Basis Spreads
+- **DPU “Future of Gas” Proceeding (2020–2024)**  
+  - **Effect:** Signals that Massachusetts gas utilities must transition away from fossil gas, creating regulatory uncertainty and discouraging new pipeline development.
 
-These spreads highlight a core feature of New England’s gas market: an upstream surplus in the Marcellus coexists with downstream scarcity in Boston, creating a persistent and policy-reinforced price premium.
+- **Clean Energy and Climate Plan (2025/2030)**  
+  - **Effect:** Further limits expansion of gas-related infrastructure by prioritizing electrification and emissions reductions in the building and power sectors.
+ 
+# Experiment and Goals
 
-Research Gap
+## Research Objective
 
-Although many studies describe New England’s pipeline constraints and Boston’s elevated winter prices, the literature lacks a quantitative estimate of how much of Boston’s price burden is caused specifically by environmental-policy-induced constraints—as opposed to ordinary seasonal fluctuations or weather-driven demand.
+The central goal of this project is to quantify the **environmental policy price premium** faced by Boston due to regional pipeline constraints, state-level climate policy, and reliance on LNG imports. This premium reflects how much higher Boston’s natural-gas prices are (on average) compared to upstream hubs—specifically those located within the Marcellus Basin—because of regulatory and permitting barriers that restrict pipeline expansion.
 
-This thesis addresses that gap by quantifying the environmental policy price premium, defined as:
-
-The portion of the basis spread between Algonquin Citygate and Marcellus-area hubs that can be attributed to regulatory and permitting constraints affecting gas delivery into New England.
-
-Purpose of This Repository
-
-This repository contains:
-
-Processed hub price data (Algonquin, Henry Hub, Chicago, Marcellus)
-
-Scripts for cleaning, merging, and analyzing basis spreads
-
-Event-study models used to isolate policy-driven price impacts
-
-Figures and tables for the thesis (including winter volatility plots)
-
-Documentation supporting replicability and transparency
+## Experimental Design
