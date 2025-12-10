@@ -10,7 +10,7 @@ library(lubridate)
 library(ggplot2)
 
 readRenviron(".Renviron") # Build API Key into your prospective .Renviron document
-setwd("~/Documents/GitHub/ENVS_Seniorthesis/")
+setwd("~/Documents/GitHub/Algonquin_NatGas//")
 Sys.getenv("EIA_API_KEY") # Sign up with EIA to get API key for pricing data
 
 ```
