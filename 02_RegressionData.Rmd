@@ -1,0 +1,107 @@
+Geddy Lucier
+Senior Thesis
+Regression Pipeline
+
+This document is designed to create a fluid data pipeline to the algonquin/chicago citygate regression comparison
+
+Data Load-in preamble
+```{r}
+library(tidyverse)
+library(dplyr) # Data Manipulation
+library(lubridate) # Date manipulation
+library(ggplot2) # Visualization
+library(riem) # Weather api from airport observations
+
+
+setwd("~/Documents/GitHub/Algonquin_NatGas//")
+
+prices <- read_csv("gas_prices.csv") # comes from Bloomberg Terminal. 
+```
+Initial Price Cleaning 
+```{r}
+chicago <- prices[c(5,6)] %>% rename("Date" = "Date...5", "price" = "Last Price...6") %>%
+      mutate(Date = as.Date(Date, format = "%m/%d/%Y"),
+             city = "Chicago") 
+             
+          
+
+algonquin <- prices[c(1,2)] %>% rename("Date" = "Date...1", "price" = "Last Price...2") %>%
+     mutate(Date = as.Date(Date, format = "%m/%d/%Y"),
+             city = "Boston") 
+
+henry <- prices[c(3,4)] %>% rename("Date" = "Date...3", "Hen_Price" = "Last Price...4")
+
+master_dates <- chicago %>%
+  select("Date") %>%
+  distinct()
+
+start_date <- tail(master_dates$Date, n = 1)
+end_date <-  head(master_dates$Date,1)
+
+```
+
+Weather Feature
+```{r}
+#Boston 
+boston_weather <- riem_measures(
+  station = "BED", # Bedford Station, not enough Boston Data
+  date_start = start_date,
+  date_end = end_date) %>%
+  mutate(date = as.Date(valid)) %>%
+  group_by(date) %>%  # GROUP BY DATE FIRST
+  summarise(
+    temp_max = max(tmpf, na.rm = TRUE),
+    temp_min = min(tmpf, na.rm = TRUE),
+    temp_avg = mean(tmpf, na.rm = TRUE),
+    
+    HDD = pmax(0, 65 - temp_avg),
+    CDD = pmax(0, temp_avg - 65) ,
+    .groups = 'drop'
+  )
+
+algonquin <- algonquin %>%
+  left_join(boston_weather, by = c("Date" = "date"))
+
+
+#Chicago 
+chicago_weather <- riem_measures(
+  station = "KORD",  
+  date_start = start_date,
+  date_end = end_date) %>%
+  mutate(date = as.Date(valid)) %>%
+  group_by(date) %>%  # GROUP BY DATE FIRST
+  summarise(
+    temp_max = max(tmpf, na.rm = TRUE),
+    temp_min = min(tmpf, na.rm = TRUE),
+    temp_avg = mean(tmpf, na.rm = TRUE),
+    
+     
+    HDD = pmax(0, 65 - temp_avg),
+    CDD = pmax(0, temp_avg - 65) ,
+    .groups = 'drop'
+  )
+
+chicago <- chicago %>%
+  left_join(chicago_weather, by = c("Date" = "date"))
+
+```
+Regression Data 
+
+```{r}
+
+joint_df <- rbind(chicago, algonquin)
+
+summary(lm(price ~ city + temp_min + temp_max + temp_avg, data = joint_df))
+
+summary(lm(price ~ city + CDD + HDD, data = joint_df))
+
+```
+
+
+
+
+
+
+
+
+
