@@ -1,0 +1,190 @@
+Geddy Lucier
+Price Data Cleaning Script
+```{r}
+library(tidyverse)
+library(dplyr) # Data Manipulation
+library(lubridate) # Date manipulation
+library(ggplot2) # Visualization
+library(riem) # Weather api from airport observations
+
+prices <- read_csv("~/Documents/GitHub/Algonquin_NatGas/data/prices_new.csv")
+
+zone_load <- read_csv("~/Documents/GitHub/Algonquin_NatGas/data/zone_load.csv")
+mix_load <- read_csv("~/Documents/GitHub/Algonquin_NatGas/data/region_fuelmix_targeted.csv") #Region LEVEL
+```
+
+
+Price Data Cleaning 
+```{r}
+
+chicago <- prices[c(1,2)] %>% rename("Date" = "Date...1")
+algonquin <- prices[c(3,4)]  %>% rename("Date" = "Date...3")
+
+master_dates <- chicago %>%
+  select("Date") %>%
+  distinct()
+
+prices <- chicago %>%
+  left_join(algonquin, by = "Date")
+
+target_dates <- prices %>%
+  filter(!is.na(boston) & !is.na(chicago)) %>%
+  pull(Date) %>%
+  sort()
+```
+Load and Mix cleaning 
+```{r}
+head(zone_load, 10)
+tail(zone_load,10)
+
+#
+zone_load <- zone_load %>% 
+  arrange(desc(period)) %>% filter(timezone == "Eastern") 
+
+daily_total <- mix_load %>%
+  group_by(date, respondent) %>%
+  summarise(total_mwh = sum(daily_mwh, na.rm = TRUE), .groups = "drop")
+
+mix_df <- mix_load %>%
+  left_join(daily_total, by = c("date", "respondent")) %>%
+  mutate(class = ifelse(`type-name` %in% c("Solar", "Hydro",
+                                            "Battery storage", "Wind"),
+                        "green", "traditional")) %>%
+  group_by(date, respondent, class) %>%
+  summarise(
+    total_renewable = sum(daily_mwh, na.rm = TRUE),
+    total_mwh       = first(total_mwh),
+    .groups = "drop"
+  ) %>%
+  mutate(pct_of_total = total_renewable / total_mwh * 100)
+```
+
+
+```{r}
+mix_df %>%
+  filter(class == "green") %>%
+  ggplot(aes(x = date, y = pct_of_total, color = respondent)) +
+  geom_line(linewidth = 0.8, alpha = 0.8) +
+  facet_wrap(~ respondent, ncol = 1) +
+  scale_color_manual(values = c("ISNE" = "#2A9D8F", "PJM" = "#E76F51")) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "6 months") +
+  labs(
+    title = "Renewable Energy as Share of Total Generation",
+    subtitle = "ISO New England vs. PJM Interconnection",
+    x = "Date",
+    y = "Renewable Share (%)",
+    caption = "Source: Energy Information Authority, Renewables defined as Solar, Hydro, and Battery Storage."
+  ) +
+  theme_bw(base_family = "serif") +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 10, color = "gray30"),
+    strip.text       = element_text(face = "bold", size = 11),
+    legend.position  = "none",      # redundant with facet labels
+    panel.grid.minor = element_blank(),
+    axis.text.x      = element_text(angle = 45, hjust = 1)
+  )
+```
+```{r}
+
+zone_load %>%
+  mutate(
+    date = as.Date(period),
+    region = case_when(
+      subba == "4008" ~ "Boston",
+      subba == "CE"   ~ "Chicago",
+      TRUE ~ subba
+    )
+  ) %>%
+  group_by(date, region) %>%
+  summarise(daily_mwh = sum(value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = date, y = daily_mwh / 1000, color = region)) +
+  geom_line(linewidth = 0.5, alpha = 0.8) +
+  facet_wrap(~ region, ncol = 1, scales = "free_y") +
+  scale_color_manual(values = c("Boston" = "#2A9D8F", "Chicago" = "#E76F51")) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "6 months") +
+  labs(
+    title    = "Daily Electricity Demand by City Region",
+    subtitle = "Boston vs. Chicago",
+    x        = "Date",
+    y        = "Daily Load (GWh)",
+    caption  = "Source: U.S. Energy Information Administration, Form EIA-930."
+  ) +
+  theme_bw() +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 10, color = "gray30"),
+    plot.caption     = element_text(size = 7, color = "gray40", hjust = 0),
+    strip.text       = element_text(color = "white", face = "bold", size = 11),
+    legend.position  = "none",
+    panel.grid.minor = element_blank(),
+    axis.text.x      = element_text(angle = 45, hjust = 1)
+  )
+```
+
+```{r}
+write_csv(mix_df, file = "~/Documents/GitHub/Algonquin_NatGas/data/mix_load_df.csv")
+```
+
+
+
+Plotting
+```{r}
+ggplot(prices, aes(x = Date)) +
+  geom_line(aes(y = chicago,  color = "Chicago"),   linewidth = 1.2) +
+  geom_line(aes(y = boston,   color = "Algonquin"), linewidth = 1.2) +
+  scale_color_manual(
+    name   = "Hub",
+    values = c("Chicago" = "#264653", "Algonquin" = "#E76F51")
+  ) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "6 months") +
+  labs(
+    title    = "Natural Gas Hub Prices: Chicago vs. Algonquin",
+    subtitle = "Monthly spot prices in USD per MMBtu",
+    x        = "Date",
+    y        = "Price (USD/MMBtu)"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title       = element_text(face = "bold", size = 14),
+    plot.subtitle    = element_text(size = 10, color = "gray30"),
+    legend.position  = "bottom",
+    panel.grid.minor = element_blank(),
+    axis.text.x      = element_text(angle = 45, hjust = 1)
+  ) +
+  coord_cartesian(ylim = c(0, 10))
+
+```
+
+```{r}
+prices %>%
+  mutate(spread = chicago - boston) %>%
+  ggplot(aes(x = Date, y = spread)) +
+  geom_line(linewidth = 1.2, color = "#2E86AB") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.8) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "6 months") +
+  labs(
+    title    = "Natural Gas Price Spread: Chicago vs. Algonquin",
+    subtitle = "Chicago minus Algonquin (USD/MMBtu) — positive values indicate Chicago premium",
+    x        = "Date",
+    y        = "Spread (USD/MMBtu)"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title       = element_text(face = "bold", size = 14),
+    plot.subtitle    = element_text(size = 10, color = "gray30"),
+    legend.position  = "bottom",
+    panel.grid.minor = element_blank(),
+    axis.text.x      = element_text(angle = 45, hjust = 1)
+  )
+```
+
+
+
+
+
+
+```{r}
+#write_csv(prices, file = "~/Documents/GitHub/Algonquin_NatGas/data/price_data_final.csv")
+```
+

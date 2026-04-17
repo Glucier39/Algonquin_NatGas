@@ -13,8 +13,9 @@ library(basemaps)
 library(maptiles)
 library(rmapshaper)
 library(sfnetworks)
+library(cowplot)
 library(dplyr)
-setwd("~/Documents/GitHub/ENVS_Seniorthesis/")
+setwd("~/Documents/GitHub/Algonquin_NatGas//")
 ```
 
 
@@ -25,6 +26,9 @@ pipes <- st_read("data/naturalgas_interintrastate_pipelines_us_eia.geojson")
 basin <- st_read("data/MiddleDevonianMarcellusShaleAUs/")
 basin <- st_transform(basin, 4326)
 
+world_water <- world[world$ID %in% c("USA:Great Lakes", "Lake Michigan"), ]
+lakes <- st_as_sf(map("lakes", plot = FALSE, fill = TRUE))
+lakes <- st_transform(lakes, 4326)
 
 us <- st_as_sf(map("state", plot = FALSE, fill = TRUE))
 us <- st_transform(us, 4326)
@@ -73,12 +77,137 @@ ggplot() +
 ```
 
 ```{r}
-
+library(cowplot)
+library(sf)
+ggplot() +
+  geom_sf(data = us, fill = "gray91", color = "white", linewidth = 0.3) +
+  geom_sf(data = pipes, color = "#8B0000", linewidth = 0.15, alpha = 0.7) +
+  geom_sf(data = boston_sf,  color = "black", size = 2) +
+  geom_sf(data = chicago_sf, color = "black", size = 2) +
+  annotate("text", x = -69.5, y = 42.8, label = "Boston",
+          size = 3, hjust = 0) +
+  annotate("text", x = -86.5, y = 42.5, label = "Chicago",
+           family = "serif", size = 3, hjust = 0) +
+  coord_sf(xlim = c(-125, -66), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title      = element_text(face = "bold", size = 13, hjust = 0),
+    plot.subtitle   = element_text(size = 9, hjust = 0, color = "gray30", margin = margin(b = 8)),
+    plot.caption    = element_text(size = 7, color = "gray40", hjust = 0, margin = margin(t = 8)),
+    panel.grid.major = element_line(color = "gray85", linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = NA, color = NA),
+    plot.background  = element_rect(fill = "white",   color = NA),
+    axis.text        = element_text(size = 7, color = "gray40"),
+    axis.title       = element_blank(),
+    plot.margin      = margin(8, 8, 8, 8)
+  ) +
+  labs(
+    title    = "U.S. Natural Gas Pipeline Network",
+    subtitle = "Interstate and intrastate pipelines with key demand centers highlighted",
+    caption  = "Source: U.S. Energy Information Administration (EIA)."
+  )
 ```
 
+```{r}
+# National overview
+p_national <- ggplot() +
+  geom_sf(data = us, fill = "gray91", color = "white", linewidth = 0.3) +
+  geom_sf(data = pipes, color = "#8B0000", linewidth = 0.15, alpha = 0.7) +
+  geom_sf(data = boston_sf,  color = "black", size = 2) +
+  geom_sf(data = chicago_sf, color = "black", size = 2) +
+  annotate("text", x = -69.5, y = 42.8, label = "Boston",  family = "serif", size = 3, hjust = 0) +
+  annotate("text", x = -86.5, y = 42.5, label = "Chicago", family = "serif", size = 3, hjust = 0) +
+  coord_sf(xlim = c(-125, -66), ylim = c(24, 50), expand = FALSE) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13, hjust = 0),
+    plot.subtitle    = element_text(size = 9, hjust = 0, color = "gray30", margin = margin(b = 8)),
+    panel.grid.major = element_line(color = "gray85", linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "#dde8f0", color = NA),
+    plot.background  = element_rect(fill = "white",   color = NA),
+    axis.text        = element_text(size = 7, color = "gray40"),
+    axis.title       = element_blank(),
+    plot.margin      = margin(8, 8, 4, 8)
+  ) +
+  labs(
+    title    = "U.S. Natural Gas Pipeline Network",
+    subtitle = "Interstate and intrastate pipelines with key demand centers highlighted"
+  )
 
+# Shared city theme
+city_theme <- theme_minimal(base_family = "serif") +
+  theme(
+    plot.title       = element_text(face = "bold", size = 11, hjust = 0),
+    panel.grid.major = element_line(color = "gray85", linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.border     = element_rect(color = "gray60", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "#dde8f0", color = NA),
+    plot.background  = element_rect(fill = "white",   color = NA),
+    axis.text        = element_text(size = 7, color = "gray40"),
+    axis.title       = element_blank(),
+    plot.margin      = margin(4, 8, 4, 8)
+  )
 
+p_boston <- ggplot() +
+  geom_sf(data = world, fill = "gray91", color = "white", linewidth = 0.2) +
+  geom_sf(data = pipes_boston, color = "#8B0000", linewidth = 0.35, alpha = 0.9) +
+  geom_sf(data = us, fill = NA, color = "gray60", linewidth = 0.3) +
 
+  geom_sf(data = boston_sf, color = "black", size = 1.8) +
+  annotation_scale(location = "bl", width_hint = 0.3,
+                   text_family = "serif", text_cex = 0.55, line_width = 0.5) +
+  annotation_north_arrow(location = "tr", which_north = "true",
+                         height = unit(0.55, "cm"), width = unit(0.55, "cm"),
+                         style = north_arrow_minimal(text_family = "serif", text_size = 6)) +
+  annotate("text", x = -69.6, y = 41.05,
+           label = paste0("n = ", nrow(pipes_boston), " segments"),
+           hjust = 1, size = 2.5, family = "serif", color = "gray35") +
+  coord_sf(xlim = c(-72.0, -69.5), ylim = c(41.0, 43.2), expand = FALSE) +
+  city_theme +
+  labs(title = "Boston, MA")
+
+p_chicago <- ggplot() +
+  geom_sf(data = world, fill = "gray91", color = "white", linewidth = 0.2) +
+  geom_sf(data = us, fill = NA, color = "gray60", linewidth = 0.3) +
+  geom_sf(data = pipes_chicago, color = "#8B0000", linewidth = 0.2, alpha = 0.85) +
+  geom_sf(data = lakes, fill = "#dde8f0", color = NA) +
+  geom_sf(data = chicago_sf, color = "black", size = 1.8) +
+  annotation_scale(location = "bl", width_hint = 0.3,
+                   text_family = "serif", text_cex = 0.55, line_width = 0.5) +
+  annotation_north_arrow(location = "tr", which_north = "true",
+                         height = unit(0.55, "cm"), width = unit(0.55, "cm"),
+                         style = north_arrow_minimal(text_family = "serif", text_size = 6)) +
+  annotate("text", x = -86.6, y = 40.45,
+           label = paste0("n = ", nrow(pipes_chicago), " segments"),
+           hjust = 1, size = 2.5, family = "serif", color = "gray35") +
+  coord_sf(xlim = c(-89.5, -86.5), ylim = c(40.4, 43.0), expand = FALSE) +
+  city_theme +
+  labs(title = "Chicago, IL")
+
+bottom_row <- plot_grid(p_boston, p_chicago, ncol = 2, align = "hv")
+
+caption_row <- ggdraw() +
+  draw_label(
+    "Source: U.S. Energy Information Administration (EIA). Panels show pipelines within ~150 km radius of city center.",
+    fontfamily = "serif", size = 7, color = "gray40", x = 0.01, hjust = 0
+  )
+
+title_row <- ggdraw() +
+  draw_label(
+    "Boston vs. Chicago Natural Gas Pipeline Infrastructure",
+    fontface = "bold", fontfamily = "serif", size = 14, x = 0.01, hjust = 0
+  )
+
+plot_grid(
+  title_row,
+  bottom_row,
+  caption_row,
+  ncol        = 1,
+  rel_heights = c(0.08, 1, 0.06)
+)
+```
 
 
 

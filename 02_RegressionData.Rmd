@@ -11,97 +11,255 @@ library(dplyr) # Data Manipulation
 library(lubridate) # Date manipulation
 library(ggplot2) # Visualization
 library(riem) # Weather api from airport observations
+library(stargazer)
 
 
-setwd("~/Documents/GitHub/Algonquin_NatGas//")
+setwd("~/Documents/GitHub/Algonquin_NatGas/data/")
 
-prices <- read_csv("gas_prices.csv") # comes from Bloomberg Terminal. 
+prices <- read_csv("prices_new.csv") # comes from Bloomberg Terminal. 
+electricity_demand <- read_csv("electricity_demand.csv")
+mix_load_df <- read_csv("mix_load_df.csv")
 ```
-Initial Price Cleaning 
+Initial Price and electricity cleaning 
 ```{r}
-chicago <- prices[c(5,6)] %>% rename("Date" = "Date...5", "price" = "Last Price...6") %>%
-      mutate(Date = as.Date(Date, format = "%m/%d/%Y"),
-             city = "Chicago") 
-             
-          
-
-algonquin <- prices[c(1,2)] %>% rename("Date" = "Date...1", "price" = "Last Price...2") %>%
-     mutate(Date = as.Date(Date, format = "%m/%d/%Y"),
-             city = "Boston") 
-
-henry <- prices[c(3,4)] %>% rename("Date" = "Date...3", "Hen_Price" = "Last Price...4")
+chicago <- prices[c(1,2)] %>% rename("Date" = "Date...1")
+algonquin <- prices[c(3,4)]  %>% rename("Date" = "Date...3")
 
 master_dates <- chicago %>%
   select("Date") %>%
   distinct()
 
-start_date <- tail(master_dates$Date, n = 1)
-end_date <-  head(master_dates$Date,1)
+prices <- chicago %>%
+  left_join(algonquin, by = "Date")
 
+start_date <- tail(chicago$Date, 1)
+end_date <- head(chicago$Date,1)
 ```
+
+Electricity
+```{r}
+### Check out Algonquin_NatGas/eia_dataload_template.R to load data
+#source("/Users/geddylucier/Documents/GitHub/Algonquin_NatGas/eia_dataload.R")
+elec <- electricity_demand %>%
+  filter(timezone == "Eastern") 
+
+#Split up by city
+boston_elec <- elec %>% filter(city == "Boston")
+
+algonquin <- algonquin %>% left_join(boston_elec, by = c("Date" = "date"))
+
+chicago_elec <- elec %>% filter(city == "Chicago")
+
+chicago <- chicago %>% left_join(chicago_elec, by = c("Date" = "date"))
+```
+Renewable Generation
+```{r}
+boston_mix <- mix_load_df %>% filter(respondent == "ISNE" & class == "green") #%>% select(date, pct_of_total) # Assume regional mix is similar to city mix
+
+chicago_mix <- mix_load_df %>% filter(respondent == "PJM" & class == "green") #%>% select(date, pct_of_total) # Assume regional mix is similar to city mix
+
+algonquin <- algonquin %>% left_join(boston_mix, by = c("Date" = "date"))
+
+chicago <- chicago %>% left_join(chicago_mix, by =  c("Date" = "date"))
+
+chicago
+```
+
 
 Weather Feature
 ```{r}
-#Boston 
-boston_weather <- riem_measures(
-  station = "BED", # Bedford Station, not enough Boston Data
-  date_start = start_date,
-  date_end = end_date) %>%
-  mutate(date = as.Date(valid)) %>%
-  group_by(date) %>%  # GROUP BY DATE FIRST
-  summarise(
-    temp_max = max(tmpf, na.rm = TRUE),
-    temp_min = min(tmpf, na.rm = TRUE),
-    temp_avg = mean(tmpf, na.rm = TRUE),
-    
-    HDD = pmax(0, 65 - temp_avg),
-    CDD = pmax(0, temp_avg - 65) ,
-    .groups = 'drop'
-  )
+# #Boston 
+# boston_weather <- riem_measures(
+#   station = "BED", # Bedford Station, not enough Boston Data
+#   date_start = start_date,
+#   date_end = end_date) %>%
+#   mutate(date = as.Date(valid)) %>%
+#   group_by(date) %>%  # GROUP BY DATE FIRST
+#   summarise(
+#     temp_max = max(tmpf, na.rm = TRUE),
+#     temp_min = min(tmpf, na.rm = TRUE),
+#     temp_avg = mean(tmpf, na.rm = TRUE),
+#     
+#     HDD = pmax(0, 65 - temp_avg),
+#     CDD = pmax(0, temp_avg - 65) ,
+#     .groups = 'drop'
+#   ) %>% select(date, HDD, CDD)
+# 
+#write_csv(boston_weather, file = "boston_weather.csv")
+boston_weather <- read_csv("boston_weather.csv")
+
 
 algonquin <- algonquin %>%
   left_join(boston_weather, by = c("Date" = "date"))
 
 
-#Chicago 
-chicago_weather <- riem_measures(
-  station = "KORD",  
-  date_start = start_date,
-  date_end = end_date) %>%
-  mutate(date = as.Date(valid)) %>%
-  group_by(date) %>%  # GROUP BY DATE FIRST
-  summarise(
-    temp_max = max(tmpf, na.rm = TRUE),
-    temp_min = min(tmpf, na.rm = TRUE),
-    temp_avg = mean(tmpf, na.rm = TRUE),
-    
-     
-    HDD = pmax(0, 65 - temp_avg),
-    CDD = pmax(0, temp_avg - 65) ,
-    .groups = 'drop'
-  )
+# #Chicago
+# chicago_weather <- riem_measures(
+#   station = "KORD",
+#   date_start = start_date,
+#   date_end = end_date) %>%
+#   mutate(date = as.Date(valid)) %>%
+#   group_by(date) %>%  # GROUP BY DATE FIRST
+#   summarise(
+#     temp_max = max(tmpf, na.rm = TRUE),
+#     temp_min = min(tmpf, na.rm = TRUE),
+#     temp_avg = mean(tmpf, na.rm = TRUE),
+# 
+# 
+#     HDD = pmax(0, 65 - temp_avg),
+#     CDD = pmax(0, temp_avg - 65) ,
+#     .groups = 'drop'
+#   ) %>% select(date, HDD, CDD)
+# 
+# write_csv(chicago_weather, file = "chicago_weather.csv")
+chicago_weather <- read_csv("chicago_weather.csv")
 
 chicago <- chicago %>%
-  left_join(chicago_weather, by = c("Date" = "date"))
+  left_join(chicago_weather,  by = c("Date" = "date"))
 
 ```
+
+Summary Stats
+```{r}
+boston_clean <- algonquin %>%
+  select(boston, HDD, CDD, electricity_demand_mw, pct_of_total) %>%
+  mutate(across(everything(), as.numeric)) %>%
+  as.data.frame()
+
+chicago_clean <- chicago %>%
+  select(chicago, HDD, CDD, electricity_demand_mw, pct_of_total) %>%
+  mutate(across(everything(), as.numeric)) %>%
+  as.data.frame()
+
+stargazer(boston_clean, chicago_clean,
+          type             = "latex",
+          title            = "Descriptive Statistics",
+          digits           = 2,
+          summary          = TRUE,
+          summary.stat     = c("n", "mean", "sd", "min", "max"),
+          covariate.labels = c("Price (\\$/MMBtu)",
+                               "HDD",
+                               "CDD",
+                               "Electricity Demand (MW)",
+                               "Renewable Share (\\%)"),
+          column.labels    = c("Boston (Algonquin)", "Chicago"),
+          column.separate  = c(5, 5),
+          notes            = "Sample period 2020--2025. HDD and CDD computed using 65$^\\circ$F baseline.",
+          notes.align      = "l",
+          out              = "descriptive_stats.tex")
+```
+
+
+joint_df creation
+```{r}
+chicago <- chicago %>% rename("price" = "chicago") %>% select(Date, price, city, electricity_demand_mw, pct_of_total, HDD, CDD)
+
+algonquin <- algonquin %>% rename("price" = "boston") %>% select(Date, price, city, electricity_demand_mw, pct_of_total, HDD, CDD)# need to make names consistent
+
+
+joint_df <- rbind(chicago, algonquin) 
+copy_df <- joint_df # make a copy with NAs
+joint_df <- joint_df %>% drop_na()
+
+
+colnames(joint_df)
+```
+
+
 Regression Data 
+```{r}
+summary(lm(price ~ factor(city) + HDD + electricity_demand_mw + CDD + pct_of_total, data = joint_df))
+model <- (lm(price ~ city + HDD + electricity_demand_mw + CDD + pct_of_total, data = joint_df))
+
+```
+
+```{r}
+stargazer(model,
+          type             = "latex",
+          title            = "Regression Results: Natural Gas Price Premium",
+          dep.var.labels   = "Natural Gas Price (\\$/MMBtu)",
+          covariate.labels = c("Chicago (vs. Boston)",
+                               "Heating Degree Days (HDD)",
+                               "Electricity Demand (MW)",      # matches position 3
+                               "Cooling Degree Days (CDD)",    # matches position 4
+                               "Renewable Share (\\% of Total Gen.)"),
+          omit.stat        = c("ser", "f"),
+          star.cutoffs     = c(0.1, 0.05, 0.01),
+          digits           = 3,
+          digit.separator  = "",
+          column.sep.width = "10pt",
+          font.size        = "small",
+          notes            = c("Standard errors in parentheses.",
+                               "765 observations dropped due to missingness.",
+                               "Sample period: December 2019 -- December 2025."),
+          notes.align      = "l",
+          notes.append     = FALSE,
+          label            = "tab:results",
+          out              = "regression_results.tex")
+```
+
+
+Extensions
 
 ```{r}
 
-joint_df <- rbind(chicago, algonquin)
 
-summary(lm(price ~ city + temp_min + temp_max + temp_avg, data = joint_df))
-
-summary(lm(price ~ city + CDD + HDD, data = joint_df))
+boston_ext
 
 ```
 
+```{r}
+boston_mix <- mix_load_df %>%
+  filter(respondent == "ISNE" & class == "green") %>%
+  select(date, total_renewable, pct_of_total)
+
+boston_df <- prices %>%
+  select(Date,boston) %>% mutate(
+  trade_day = ifelse(is.na(boston), 0, 1))
+
+
+boston_fin <- master_dates %>%
+  left_join(boston_weather, by = c("Date" = "date")) %>% 
+  left_join(boston_mix, by = c("Date" = "date")) %>% 
+  left_join(boston_df, by = "Date") %>% select(HDD, CDD, total_renewable, pct_of_total, trade_day)
+
+colnames(boston_fin)
+boston_fin
+trade_day_model <- glm(trade_day ~  total_renewable + pct_of_total, data = boston_fin, family = binomial())
+
+summary(trade_day_model)
 
 
 
 
+```
+LOGIT STARGAZER
 
+```{r}
+stargazer(trade_day_model,
+          type             = "latex",
+          title            = "Logistic Regression: Predictors of Algonquin Trading Day Formation",
+          dep.var.labels   = "Trading Day (1 = Price Formed, 0 = No Index)",
+          covariate.labels = c("Total Renewable Generation (MWh)",
+                               "Renewable Share (\\% of Total Gen.)"),
+          apply.coef       = exp,
+          ci               = TRUE,
+          ci.level         = 0.95,
+          p.auto           = FALSE,
+          star.cutoffs     = c(0.1, 0.05, 0.01),
+          digits           = 4,
+          digit.separator  = "",
+          omit.stat        = c("aic", "ll", "bic"),
+          font.size        = "small",
+          notes            = c("Odds ratios reported with 95\\% confidence intervals.",
+                               "Binomial GLM estimated on Boston (Algonquin) observations only.",
+                               "Dependent variable equals 1 on days a daily price index formed.",
+                               "Model selected on AIC over single-variable alternatives.",
+                               "Sample period: December 2019 -- December 2025."),
+          notes.align      = "l",
+          notes.append     = FALSE,
+          label            = "tab:tradeday",
+          out              = "tradeday_results.tex")
 
-
+```
 

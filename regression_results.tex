@@ -1,0 +1,46 @@
+
+% Table created by stargazer v.5.2.3 by Marek Hlavac, Social Policy Institute. E-mail: marek.hlavac at gmail.com
+% Date and time: Wed, Apr 15, 2026 - 20:19:59
+\begin{table}[!htbp] \centering 
+  \caption{Regression Results: Natural Gas Price Premium} 
+  \label{tab:results} 
+\small 
+\begin{tabular}{@{\extracolsep{10pt}}lcc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{2}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-3} 
+\\[-1.8ex] & \multicolumn{2}{c}{Natural Gas Price (\$/MMBtu)} \\ 
+ & No FE & Year FE \\ 
+\\[-1.8ex] & (1) & (2)\\ 
+\hline \\[-1.8ex] 
+ Chicago (vs. Boston) & $-$3.086$^{***}$ & $-$1.309$^{*}$ \\ 
+  & (0.879) & (0.777) \\ 
+  & & \\ 
+ Heating Degree Days (HDD) & 0.038$^{***}$ & 0.042$^{***}$ \\ 
+  & (0.007) & (0.007) \\ 
+  & & \\ 
+ Electricity Demand (MW) & 0.00001$^{**}$ & 0.00000 \\ 
+  & (0.00000) & (0.00000) \\ 
+  & & \\ 
+ Cooling Degree Days (CDD) & 0.009 & 0.054$^{*}$ \\ 
+  & (0.035) & (0.031) \\ 
+  & & \\ 
+ Renewable Share (\% of Total Gen.) & $-$0.051$^{**}$ & $-$0.054$^{***}$ \\ 
+  & (0.023) & (0.020) \\ 
+  & & \\ 
+ Constant & 3.553$^{***}$ & 1.716 \\ 
+  & (0.373) & (2.128) \\ 
+  & & \\ 
+\hline \\[-1.8ex] 
+Year Fixed Effects & No & Yes \\ 
+Observations & 2223 & 2223 \\ 
+R$^{2}$ & 0.048 & 0.271 \\ 
+Adjusted R$^{2}$ & 0.046 & 0.267 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{2}{l}{Standard errors in parentheses.} \\ 
+ & \multicolumn{2}{l}{765 observations dropped due to missingness.} \\ 
+ & \multicolumn{2}{l}{Sample period: December 2019 -- December 2025.} \\ 
+\end{tabular} 
+\end{table} 

@@ -1,0 +1,85 @@
+Geddy Lucier
+03_Thesis Extensions
+
+This document is designed to test extended hypothesis for the Natural Gas Algonquin Hypothesis
+
+Data Load-in preamble
+```{r}
+library(tidyverse)
+library(dplyr) # Data Manipulation
+library(lubridate) # Date manipulation
+library(ggplot2) # Visualization
+library(riem) # Weather api from airport observations
+library(stargazer)
+
+
+setwd("~/Documents/GitHub/Algonquin_NatGas/data/")
+
+prices <- read_csv("prices_new.csv") # comes from Bloomberg Terminal. 
+electricity_demand <- read_csv("electricity_demand.csv")
+mix_load_df <- read_csv("mix_load_df.csv")
+```
+Initial Price Cleaning
+```{r}
+chicago <- prices[c(1,2)] %>% rename("Date" = "Date...1")
+algonquin <- prices[c(3,4)]  %>% rename("Date" = "Date...3")
+
+master_dates <- chicago %>%
+  select("Date") %>%
+  distinct()
+
+prices <- chicago %>%
+  left_join(algonquin, by = "Date")
+
+start_date <- tail(chicago$Date, 1)
+end_date <- head(chicago$Date,1)
+```
+Hypothesis:
+
+The amount of renewable energy generation across the board is correlated with whether or not Algonquin trades or not. Test using a logistic/logit regression
+
+
+
+```{r}
+boston_mix <- mix_load_df %>%
+  filter(respondent == "ISNE" & class == "green") %>%
+  select(date, total_renewable, pct_of_total)
+  
+  
+boston_df <- prices %>%
+  select(Date,boston) %>% mutate(
+  trade_day = ifelse(is.na(boston), 0, 1) 
+  #1. Column traded (built off of is.na(algonquin$boston and if there's a price))
+  ) %>%
+  left_join(boston_mix, by = c("Date" = "date")) %>%
+  #2. merge with electricity generation data 
+  
+  select(trade_day, total_renewable, pct_of_total)
+#3. logit regression
+model <- glm(trade_day ~ total_renewable + pct_of_total, data = boston_df, family = binomial())
+
+summary(model) 
+plot(model)
+
+```
+Convert LogOdds to probabilities
+```{r}
+model$coefficients
+
+b2 <- -6.184141e-05
+b3 <-  1.278046e-01 
+
+plogis(b2) # 0.4999845
+plogis(b3) # 0.5319077
+
+# Neither of these are particularly predictive in whether there will be trading on a certain day. IE, whether there is demand for natgas at algonquin or not
+```
+```{r}
+ggplot(boston_df, aes(x = pct_of_total, y = trade_day)) +
+  geom_point(alpha = 0.5) +  # Add points with some transparency to handle overplotting
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Logistic Regression of Trade Day on Total Renewable",
+       x = "Total Renewable Energy",
+       y = "Trade Day (0 or 1)") +
+  theme_minimal()
+```
