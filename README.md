@@ -1,4 +1,4 @@
-# 500 Miles from Cheap Gas: Estimating Consumer Savings from Pipeline Access in New England
+# Estimating Consumer Savings from Pipeline Access in New England
 
 **Author:** Geddy Lucier
 **Institution:** University of Pennsylvania, Department of Earth and Environmental Science
